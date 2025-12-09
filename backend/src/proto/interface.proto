@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package emotion;
+
+service EmotionService {
+  rpc SendDecryptionKey(KeyRequest) returns (StatusResponse);
+  rpc SendEncryptedImage(ImageRequest) returns (StatusResponse);
+  // Keeping the original Predict for backward compatibility if needed, or we can remove it if it's replaced by the async flow.
+  // The user requirement implies a new flow, but I'll keep it for now or replace it?
+  // User said: "the model callling part is done and working just gRPC connection is still undone"
+  // and described a specific flow. I will add the new ones.
+  rpc Predict(EmotionRequest) returns (EmotionResponse); 
+}
+
+message KeyRequest {
+  string uid = 1;
+  string key = 2; // Encrypted key or raw key? Assuming string for now as per "decrytion key sent... store it"
+}
+
+message ImageRequest {
+  string uid = 1;
+  bytes encrypted_image = 2;
+}
+
+message StatusResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message EmotionRequest {
+  string uid = 1;
+  bytes image = 2;
+}
+
+message EmotionResponse {
+  string uid = 1;
+  string class_name = 2;
+}
