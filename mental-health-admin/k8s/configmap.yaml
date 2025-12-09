@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: mental-health
+data:
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "mental_health_db"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  FRONTEND_URL: "https://student-wellbeing.gov.in"

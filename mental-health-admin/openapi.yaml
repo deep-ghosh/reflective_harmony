@@ -1,0 +1,350 @@
+openapi: 3.0.3
+info:
+  title: Mental Health Admin API
+  description: Privacy-first student mental health administration system
+  version: 1.0.0
+  contact:
+    name: System Administrator
+    email: admin@education.gov.in
+
+servers:
+  - url: https://api.student-wellbeing.gov.in/v1
+    description: Production server
+  - url: https://staging-api.student-wellbeing.gov.in/v1
+    description: Staging server
+
+security:
+  - BearerAuth: []
+
+paths:
+  /admin/overview:
+    get:
+      summary: Get dashboard overview metrics
+      tags: [Analytics]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Overview metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OverviewMetrics'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /admin/critical:
+    get:
+      summary: Get list of critical students (anonymized)
+      tags: [Students]
+      parameters:
+        - name: min_severity
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+        - name: course
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of critical students
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  students:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AnonymizedStudent'
+
+  /admin/critical/{anon_id}:
+    get:
+      summary: Get detailed view of critical student
+      tags: [Students]
+      parameters:
+        - name: anon_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Student details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudentDetail'
+
+  /admin/contact:
+    post:
+      summary: Access contact information (audited)
+      tags: [Contact]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - anon_id
+                - contact_reason
+              properties:
+                anon_id:
+                  type: string
+                contact_reason:
+                  type: string
+                  enum:
+                    - mandatory_phq9_followup
+                    - mandatory_gad7_followup
+                    - wellness_check
+                    - program_reminder
+      responses:
+        '200':
+          description: Contact information (creates audit log)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactInfo'
+        '403':
+          description: Contact access denied
+
+  /reveal/request:
+    post:
+      summary: Request identity reveal
+      tags: [Identity Reveal]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - anon_id
+                - justification
+              properties:
+                anon_id:
+                  type: string
+                justification:
+                  type: string
+                  minLength: 20
+      responses:
+        '200':
+          description: Reveal request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevealRequest'
+
+  /reveal/approve:
+    post:
+      summary: Approve identity reveal (requires 2FA)
+      tags: [Identity Reveal]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - request_id
+                - twofa_code
+                - approval_decision
+              properties:
+                request_id:
+                  type: string
+                  format: uuid
+                twofa_code:
+                  type: string
+                approval_decision:
+                  type: string
+                  enum: [approve, deny]
+      responses:
+        '200':
+          description: Reveal approved with temporary token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevealApproval'
+
+  /audit:
+    get:
+      summary: Get audit trail
+      tags: [Audit]
+      parameters:
+        - name: admin_id
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Audit logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    OverviewMetrics:
+      type: object
+      properties:
+        total_students:
+          type: integer
+        critical:
+          type: integer
+        moderate:
+          type: integer
+        good:
+          type: integer
+        pending_questionnaires:
+          type: integer
+        outreach_needed:
+          type: integer
+
+    AnonymizedStudent:
+      type: object
+      properties:
+        anon_id:
+          type: string
+        gender:
+          type: string
+          enum: [M, F, NB]
+        course:
+          type: string
+        severity:
+          type: number
+        lastSeen:
+          type: string
+          format: date-time
+        questionnaire:
+          type: boolean
+        adherence:
+          type: integer
+
+    StudentDetail:
+      allOf:
+        - $ref: '#/components/schemas/AnonymizedStudent'
+        - type: object
+          properties:
+            weeklyTrend:
+              type: array
+              items:
+                type: number
+            chatbotInteractions:
+              type: integer
+
+    ContactInfo:
+      type: object
+      properties:
+        anon_id:
+          type: string
+        contact:
+          type: object
+          properties:
+            name:
+              type: string
+            phone:
+              type: string
+            email:
+              type: string
+        accessed_at:
+          type: string
+          format: date-time
+        accessed_by:
+          type: string
+
+    RevealRequest:
+      type: object
+      properties:
+        request_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, approved, denied, expired]
+        created_at:
+          type: string
+          format: date-time
+
+    RevealApproval:
+      type: object
+      properties:
+        status:
+          type: string
+        reveal_token:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+
+    AuditLog:
+      type: object
+      properties:
+        audit_id:
+          type: string
+          format: uuid
+        admin_id:
+          type: string
+        action:
+          type: string
+        anon_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        revealed:
+          type: boolean
+
+  responses:
+    UnauthorizedError:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string

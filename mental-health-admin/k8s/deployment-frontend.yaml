@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mental-health-admin-frontend
+  namespace: mental-health
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mental-health-admin-frontend
+  template:
+    metadata:
+      labels:
+        app: mental-health-admin-frontend
+    spec:
+      containers:
+      - name: frontend
+        image: mental-health-admin-frontend:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 20
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        securityContext:
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mental-health-admin-frontend-service
+  namespace: mental-health
+spec:
+  type: ClusterIP
+  selector:
+    app: mental-health-admin-frontend
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
